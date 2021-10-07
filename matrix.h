@@ -43,7 +43,7 @@ public:
 
     template<
         bool Cond = (Dim == 1),
-        typename = typename std::enable_if_t<Cond, void>
+        typename = typename std::enable_if_t<Cond>
     >
     operator value_type() const
     {
