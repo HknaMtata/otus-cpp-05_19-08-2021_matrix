@@ -3,22 +3,38 @@
 #include <map>
 #include <array>
 
+namespace lib
+{
+
+namespace detail
+{
+
 template<
     typename Mat,
     std::size_t Dim
 >
 class Placeholder
 {
+    static_assert(Mat::dimensions_number >= Dim, "Placeholder's dimension exceeds base matrix dimensions count");
+    static_assert(Dim > 0, "No dimension");
+
+    friend Mat;
+    friend class Placeholder<Mat, Dim + 1>;
+
+    using Coordinates = std::array<std::size_t, Mat::dimensions_number>;
+
 public:
+
     using value_type = typename Mat::value_type;
+    using self_type = Placeholder<Mat, Dim>;
 
     Placeholder() = delete;
 
-    Placeholder(Placeholder<Mat, Dim>& other) = delete;
-    Placeholder<Mat, Dim>& operator=(Placeholder<Mat, Dim>& other) = delete;
+    Placeholder(self_type& other) = delete;
+    Placeholder& operator=(self_type& other) = delete;
 
-    Placeholder<Mat, Dim>(Placeholder<Mat, Dim>&& other) = delete;
-    Placeholder<Mat, Dim>& operator=(Placeholder<Mat, Dim>&& other) = delete;
+    Placeholder(self_type&& other) = delete;
+    Placeholder& operator=(self_type&& other) = delete;
 
     ~Placeholder() = default;
 
@@ -32,12 +48,17 @@ public:
     }
 
     template<
+        typename Val,
         bool Cond = (Dim == 1),
         typename = typename std::enable_if_t<Cond>
     >
-    Placeholder<Mat, Dim>& operator=(const value_type& other)
+    Placeholder<Mat, Dim>& operator=(const Val other)
     {
-        set(other);
+        if constexpr (std::is_reference_v<std::remove_const<Val>>) {
+            set(std::forward(other), indices);
+        } else {
+            set(other, indices);
+        }
         return *this;
     }
 
@@ -47,19 +68,14 @@ public:
     >
     operator value_type() const
     {
-        return get();
+        return get(indices);
     }
 
 private:
-    friend Mat;
-    friend class Placeholder<Mat, Dim + 1>;
-
-    using Coordinates = std::array<std::size_t, Mat::dimensions_number>;
-
     Placeholder(Mat& m, const std::size_t& i)
         : matrix(m)
     {
-        coordinates[Mat::dimensions_number - Dim] = std::move(i);
+        coordinates[Mat::dimensions_number - Dim] = i;
     }
 
     Placeholder(Mat& m, Coordinates&& c, const std::size_t& i)
@@ -69,35 +85,29 @@ private:
         coordinates[Mat::dimensions_number - Dim] = i;
     }
 
-    // TODO: ref
-    template<std::size_t... I>
-    void set(const value_type& other, std::index_sequence<I...>)
+    template<typename Val, std::size_t... I>
+    void set(const Val other, std::index_sequence<I...>)
     {
-        matrix.set(other, coordinates[I]...);
+        if constexpr (std::is_reference_v<std::remove_const<Val>>) {
+            matrix.set(std::forward(other), coordinates[I]...); 
+        } else {
+            matrix.set(other, coordinates[I]...);
+        }
     }
 
-    template<typename Indices = std::make_index_sequence<Mat::dimensions_number>>
-    void set(const value_type& other)
-    {
-        set(other, Indices{});
-    }
-
-    // TODO: ref
     template<std::size_t... I>
     value_type get(std::index_sequence<I...>) const
     {
         return matrix.get(coordinates[I]...);
     }
 
-    template<typename Indices = std::make_index_sequence<Mat::dimensions_number>>
-    value_type get() const
-    {
-        return get(Indices{});
-    }
-
     Mat& matrix;
     Coordinates coordinates;
+
+    static const std::make_index_sequence<Mat::dimensions_number> indices;
 };
+
+}
 
 template<
     typename T,
@@ -143,12 +153,12 @@ public:
     {
         const_iterator it = nodes.find(head);
         if(it != nodes.end())
-            return it->second.get(coordinates...);
+            return it->second.get(std::forward<Indexes>(coordinates)...);
         return default_value;
     }
 
-    template<typename Val, typename Index>
-    void set(Val&& val, Index&& coordinate)
+    template<typename Index>
+    void set(const T& val, Index&& coordinate)
     {
         iterator it = nodes.find(coordinate);
         if(it == nodes.end()) {
@@ -162,24 +172,24 @@ public:
         }
     }
 
-    template<typename Val, typename Index, typename... Indexes>
-    void set(Val&& val, Index&& head, Indexes&&... coordinates)
+    template<typename Index, typename... Indexes>
+    void set(const T& val, Index&& head, Indexes&&... coordinates)
     {
         iterator it = nodes.find(head);
         if(it != nodes.end()) {
-            it->second.set(val, coordinates...);
+            it->second.set(val, std::forward<Indexes>(coordinates)...);
             if(it->second.size() == 0)
                 nodes.erase(it);
         } else {
             if(val == default_value)
                 return;
-            nodes[head].set(val, coordinates...);
+            nodes[head].set(val, std::forward<Indexes>(coordinates)...);
         }
     }
 
-    Placeholder<self_type, Dims> operator[](const std::size_t& index)
+    detail::Placeholder<self_type, Dims> operator[](const std::size_t& index)
     {
-        return Placeholder<self_type, Dims>(*this, index);
+        return detail::Placeholder<self_type, Dims>(*this, index);
     }
 
     const_iterator begin() const
@@ -197,3 +207,58 @@ private:
 
     nodes_container nodes;
 };
+
+}
+
+namespace ser
+{
+
+namespace detail
+{
+
+template<typename T>
+void print(const T val) {
+    std::cout << val;
+}
+
+template<typename T, typename... Args>
+void print(const T val, Args&&... coordinates) {
+    std::cout << val << ',';
+    print(std::forward<Args>(coordinates)...);
+}
+
+template<typename Val, typename... Args>
+void print_flat_dummy(const Val v, Args&&... coordinates)
+{
+    std::cout << "{";
+    print(std::forward<Args>(coordinates)...);
+    std::cout << "}: " << v << "\n";
+}
+
+}
+
+template<
+    typename Mat,
+    typename... Args
+>
+std::enable_if_t<(Mat::dimensions_number == 1)> print_flat(const Mat& m, Args&&... coordinates)
+{
+    for(auto&& [dim, vals] : m)
+    {
+        detail::print_flat_dummy(vals, dim, std::forward<Args>(coordinates)...);
+    }
+}
+
+template<
+    typename Mat,
+    typename... Args
+>
+std::enable_if_t<(Mat::dimensions_number > 1)> print_flat(const Mat& m, Args&&... coordinates)
+{
+    for(auto&& [dim, vals] : m)
+    {
+        print_flat(vals, dim, std::forward<Args>(coordinates)...);
+    }
+}
+
+}

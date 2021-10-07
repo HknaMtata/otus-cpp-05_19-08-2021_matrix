@@ -3,7 +3,7 @@
 
 int main(int , char**)
 {
-    Matrix<int> m;
+    lib::Matrix<int> m;
 
     for(std::size_t i = 0; i <= 9; ++i)
     {
@@ -22,13 +22,7 @@ int main(int , char**)
 
     std::cout << m.size() << "\n";
 
-    for(auto&& [row, vals] : m)
-    {
-        for(auto&& [col, val] : vals)
-        {
-            std::cout << "{" << row << "," << col << "}: " << val << "\n";
-        }
-    }
+    ser::print_flat(m);
 
     return 0;
 }
