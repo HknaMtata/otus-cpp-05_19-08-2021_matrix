@@ -30,11 +30,11 @@ public:
 
     Placeholder() = delete;
 
-    Placeholder(self_type& other) = delete;
-    Placeholder& operator=(self_type& other) = delete;
+    Placeholder(self_type&) = delete;
+    Placeholder& operator=(self_type&) = delete;
 
-    Placeholder(self_type&& other) = delete;
-    Placeholder& operator=(self_type&& other) = delete;
+    Placeholder(self_type&&) = delete;
+    Placeholder& operator=(self_type&&) = delete;
 
     ~Placeholder() = default;
 
@@ -44,7 +44,7 @@ public:
     >
     Placeholder<Mat, Dim - 1> operator[](const std::size_t& index)
     {
-        return Placeholder<Mat, Dim - 1>(matrix, std::move(coordinates), index);
+        return Placeholder<Mat, Dim - 1>(m_matrix, std::move(m_coordinates), index);
     }
 
     template<
@@ -72,37 +72,37 @@ public:
     }
 
 private:
-    Placeholder(Mat& m, const std::size_t& i)
-        : matrix(m)
+    Placeholder(Mat& matrix, const std::size_t& i)
+        : m_matrix(matrix)
     {
-        coordinates[Mat::dimensions_number - Dim] = i;
+        m_coordinates[Mat::dimensions_number - Dim] = i;
     }
 
-    Placeholder(Mat& m, Coordinates&& c, const std::size_t& i)
-        : matrix(m)
-        , coordinates(std::move(c))
+    Placeholder(Mat& matrix, Coordinates&& coordinates, const std::size_t& i)
+        : m_matrix(matrix)
+        , m_coordinates(std::move(coordinates))
     {
-        coordinates[Mat::dimensions_number - Dim] = i;
+        m_coordinates[Mat::dimensions_number - Dim] = i;
     }
 
     template<typename Val, std::size_t... I>
     void set(const Val other, std::index_sequence<I...>)
     {
         if constexpr (std::is_reference_v<std::remove_const<Val>>) {
-            matrix.set(std::forward(other), coordinates[I]...); 
+            m_matrix.set(std::forward(other), m_coordinates[I]...); 
         } else {
-            matrix.set(other, coordinates[I]...);
+            m_matrix.set(other, m_coordinates[I]...);
         }
     }
 
     template<std::size_t... I>
     value_type get(std::index_sequence<I...>) const
     {
-        return matrix.get(coordinates[I]...);
+        return m_matrix.get(m_coordinates[I]...);
     }
 
-    Mat& matrix;
-    Coordinates coordinates;
+    Mat& m_matrix;
+    Coordinates m_coordinates;
 
     static const std::make_index_sequence<Mat::dimensions_number> indices;
 };
@@ -130,10 +130,10 @@ public:
     std::size_t size() const
     {
         if constexpr (Dims == 1) {
-            return nodes.size();
+            return m_nodes.size();
         } else {
             std::size_t sz = 0;
-            for(auto&& [index, submatrix] : nodes)
+            for(auto&& [index, submatrix] : m_nodes)
                 sz += submatrix.size();
             return sz;
         }
@@ -142,8 +142,8 @@ public:
     template<typename Index>
     T get(Index&& coordinate) const
     {
-        const_iterator it = nodes.find(coordinate);
-        if(it != nodes.end())
+        const_iterator it = m_nodes.find(coordinate);
+        if(it != m_nodes.end())
             return it->second;
         return default_value;
     }
@@ -151,8 +151,8 @@ public:
     template<typename Index, typename... Indexes>
     T get(Index&& head, Indexes&&... coordinates) const
     {
-        const_iterator it = nodes.find(head);
-        if(it != nodes.end())
+        const_iterator it = m_nodes.find(head);
+        if(it != m_nodes.end())
             return it->second.get(std::forward<Indexes>(coordinates)...);
         return default_value;
     }
@@ -160,30 +160,30 @@ public:
     template<typename Index>
     void set(const T& val, Index&& coordinate)
     {
-        iterator it = nodes.find(coordinate);
-        if(it == nodes.end()) {
+        iterator it = m_nodes.find(coordinate);
+        if(it == m_nodes.end()) {
             if(val != default_value)
-                nodes[coordinate] = val;
+                m_nodes[coordinate] = val;
         } else {
             if(val != default_value)
                 it->second = val;
             else
-                nodes.erase(it);
+                m_nodes.erase(it);
         }
     }
 
     template<typename Index, typename... Indexes>
     void set(const T& val, Index&& head, Indexes&&... coordinates)
     {
-        iterator it = nodes.find(head);
-        if(it != nodes.end()) {
+        iterator it = m_nodes.find(head);
+        if(it != m_nodes.end()) {
             it->second.set(val, std::forward<Indexes>(coordinates)...);
             if(it->second.size() == 0)
-                nodes.erase(it);
+                m_nodes.erase(it);
         } else {
             if(val == default_value)
                 return;
-            nodes[head].set(val, std::forward<Indexes>(coordinates)...);
+            m_nodes[head].set(val, std::forward<Indexes>(coordinates)...);
         }
     }
 
@@ -194,71 +194,18 @@ public:
 
     const_iterator begin() const
     {
-        return nodes.cbegin();
+        return m_nodes.cbegin();
     }
 
     const_iterator end() const
     {
-        return nodes.cend();
+        return m_nodes.cend();
     }
 
 private:
     using iterator = typename nodes_container::iterator;
 
-    nodes_container nodes;
+    nodes_container m_nodes;
 };
-
-}
-
-namespace ser
-{
-
-namespace detail
-{
-
-template<typename T>
-void print(const T val) {
-    std::cout << val;
-}
-
-template<typename T, typename... Args>
-void print(const T val, Args&&... coordinates) {
-    std::cout << val << ',';
-    print(std::forward<Args>(coordinates)...);
-}
-
-template<typename Val, typename... Args>
-void print_flat_dummy(const Val v, Args&&... coordinates)
-{
-    std::cout << "{";
-    print(std::forward<Args>(coordinates)...);
-    std::cout << "}: " << v << "\n";
-}
-
-}
-
-template<
-    typename Mat,
-    typename... Args
->
-std::enable_if_t<(Mat::dimensions_number == 1)> print_flat(const Mat& m, Args&&... coordinates)
-{
-    for(auto&& [dim, vals] : m)
-    {
-        detail::print_flat_dummy(vals, dim, std::forward<Args>(coordinates)...);
-    }
-}
-
-template<
-    typename Mat,
-    typename... Args
->
-std::enable_if_t<(Mat::dimensions_number > 1)> print_flat(const Mat& m, Args&&... coordinates)
-{
-    for(auto&& [dim, vals] : m)
-    {
-        print_flat(vals, dim, std::forward<Args>(coordinates)...);
-    }
-}
 
 }
