@@ -2,119 +2,7 @@
 
 #include <map>
 #include <array>
-#include <numeric>
 
-template<
-    typename Mat,
-    std::size_t Dim
->
-class Placeholder;
-
-// TODO: forbid to crate matrix with 0 dimensions
-template<
-    typename T,
-    T Default = 0,
-    std::size_t Dims = 2
-    // bool Cond = (Dims > 0),
-    // typename = typename std::enable_if_t<Cond, void>
->
-class Matrix
-{
-public:
-    using value_type = T;
-    using self_type = Matrix<T, Default, Dims>;
-    using SubMatrix = std::conditional_t< (Dims > 1), Matrix<T, Default, Dims - 1>, value_type >;
-
-    using nodes_container = std::map<std::size_t, SubMatrix>;
-    using const_iterator = typename nodes_container::const_iterator;
-
-    static constexpr std::size_t default_value = Default;
-    static constexpr std::size_t dimensions_number = Dims;
-
-    std::size_t size() const
-    {
-        if constexpr (Dims == 1) {
-            return nodes.size();
-        } else {
-            std::size_t sz = 0;
-            for(auto&& [index, submatrix] : nodes)
-                sz += submatrix.size();
-            return sz;
-        }
-    }
-
-    template<typename Index>
-    T get(Index&& coordinate) const
-    {
-        const_iterator it = nodes.find(coordinate);
-        if(it != nodes.end())
-            return it->second;
-        return default_value;
-    }
-
-    template<typename Index, typename... Indexes>
-    T get(Index&& head, Indexes&&... coordinates) const
-    {
-        const_iterator it = nodes.find(head);
-        if(it != nodes.end())
-            return it->second.get(coordinates...);
-        return default_value;
-    }
-
-    template<typename Val, typename Index>
-    void set(Val&& value, Index&& coordinate)
-    {
-        iterator it = nodes.find(coordinate);
-        if(it == nodes.end()) {
-            if(value != default_value)
-                nodes[coordinate] = value;
-        } else {
-            if(value != default_value)
-                it->second = value;
-            else
-                nodes.erase(it);
-        }
-    }
-
-    template<typename Val, typename Index, typename... Indexes>
-    void set(Val&& value, Index&& head, Indexes&&... coordinates)
-    {
-        iterator it = nodes.find(head);
-        if(it != nodes.end()) {
-            it->second.set(value, coordinates...);
-            if(it->second.size() == 0)
-                nodes.erase(it);
-        } else {
-            if(value == default_value)
-                return;
-            nodes[head].set(value, coordinates...);
-        }
-    }
-
-    Placeholder<self_type, Dims> operator[](const std::size_t& index)
-    {
-        return Placeholder<self_type, Dims>(*this, index);
-    }
-
-    const_iterator begin() const
-    {
-        return nodes.cbegin();
-    }
-
-    const_iterator end() const
-    {
-        return nodes.cend();
-    }
-
-private:
-    using iterator = typename nodes_container::iterator;
-
-    nodes_container nodes;
-};
-
-// TODO: forbid to crate a Placeholder with MaxDims < 2
-// TODO: forbid to crate a Placeholder with Dims == 0
-// TODO: forbid to crate a Placeholder with MaxDims < Dims
 template<
     typename Mat,
     std::size_t Dim
@@ -209,4 +97,104 @@ private:
 
     Mat& matrix;
     Coordinates coordinates;
+};
+
+template<
+    typename T,
+    T Default = 0,
+    std::size_t Dims = 2
+    // TODO: compile error, can't instantiate SubMatrix
+    // typename Enable = std::enable_if_t<(Dims > 0)> 
+>
+class Matrix
+{
+public:
+    using value_type = T;
+    using self_type = Matrix<T, Default, Dims>;
+    using SubMatrix = std::conditional_t< (Dims > 1), Matrix<T, Default, Dims - 1>, value_type >;
+    using nodes_container = std::map<std::size_t, SubMatrix>;
+    using const_iterator = typename nodes_container::const_iterator;
+
+    static constexpr std::size_t default_value = Default;
+    static constexpr std::size_t dimensions_number = Dims;
+
+    std::size_t size() const
+    {
+        if constexpr (Dims == 1) {
+            return nodes.size();
+        } else {
+            std::size_t sz = 0;
+            for(auto&& [index, submatrix] : nodes)
+                sz += submatrix.size();
+            return sz;
+        }
+    }
+
+    template<typename Index>
+    T get(Index&& coordinate) const
+    {
+        const_iterator it = nodes.find(coordinate);
+        if(it != nodes.end())
+            return it->second;
+        return default_value;
+    }
+
+    template<typename Index, typename... Indexes>
+    T get(Index&& head, Indexes&&... coordinates) const
+    {
+        const_iterator it = nodes.find(head);
+        if(it != nodes.end())
+            return it->second.get(coordinates...);
+        return default_value;
+    }
+
+    template<typename Val, typename Index>
+    void set(Val&& val, Index&& coordinate)
+    {
+        iterator it = nodes.find(coordinate);
+        if(it == nodes.end()) {
+            if(val != default_value)
+                nodes[coordinate] = val;
+        } else {
+            if(val != default_value)
+                it->second = val;
+            else
+                nodes.erase(it);
+        }
+    }
+
+    template<typename Val, typename Index, typename... Indexes>
+    void set(Val&& val, Index&& head, Indexes&&... coordinates)
+    {
+        iterator it = nodes.find(head);
+        if(it != nodes.end()) {
+            it->second.set(val, coordinates...);
+            if(it->second.size() == 0)
+                nodes.erase(it);
+        } else {
+            if(val == default_value)
+                return;
+            nodes[head].set(val, coordinates...);
+        }
+    }
+
+    Placeholder<self_type, Dims> operator[](const std::size_t& index)
+    {
+        return Placeholder<self_type, Dims>(*this, index);
+    }
+
+    const_iterator begin() const
+    {
+        return nodes.cbegin();
+    }
+
+    const_iterator end() const
+    {
+        return nodes.cend();
+    }
+
+private:
+    using iterator = typename nodes_container::iterator;
+
+    nodes_container nodes;
 };
