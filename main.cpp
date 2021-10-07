@@ -15,7 +15,7 @@ int main(int , char**)
     {
         for(std::size_t col = 1; col <= 8; ++col)
         {
-            std::cout << static_cast<int>(m[row][col]) << " ";
+            std::cout << m[row][col] << " ";
         }
         std::cout << "\n";
     }
