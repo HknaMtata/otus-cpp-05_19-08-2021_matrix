@@ -103,11 +103,10 @@ template<
     typename T,
     T Default = 0,
     std::size_t Dims = 2
-    // TODO: compile error, can't instantiate SubMatrix
-    // typename Enable = std::enable_if_t<(Dims > 0)> 
 >
 class Matrix
 {
+    static_assert(Dims > 0, "Too few dimensions");
 public:
     using value_type = T;
     using self_type = Matrix<T, Default, Dims>;
