@@ -3,7 +3,6 @@
 #include <map>
 #include <array>
 #include <numeric>
-#include <utility>
 
 template<
     typename Mat,
@@ -22,13 +21,15 @@ template<
 class Matrix
 {
 public:
-    using self_type = Matrix<T, Default, Dims>;
     using value_type = T;
+    using self_type = Matrix<T, Default, Dims>;
+    using SubMatrix = std::conditional_t< (Dims > 1), Matrix<T, Default, Dims - 1>, value_type >;
+
+    using nodes_container = std::map<std::size_t, SubMatrix>;
+    using const_iterator = typename nodes_container::const_iterator;
 
     static constexpr std::size_t default_value = Default;
     static constexpr std::size_t dimensions_number = Dims;
-
-    using SubMatrix = std::conditional_t< (Dims > 1), Matrix<T, Default, Dims - 1>, value_type >;
 
     std::size_t size() const
     {
@@ -95,9 +96,17 @@ public:
         return Placeholder<self_type, Dims>(*this, index);
     }
 
+    const_iterator begin() const
+    {
+        return nodes.cbegin();
+    }
+
+    const_iterator end() const
+    {
+        return nodes.cend();
+    }
+
 private:
-    using nodes_container = std::map<std::size_t, SubMatrix>;
-    using const_iterator = typename nodes_container::const_iterator;
     using iterator = typename nodes_container::iterator;
 
     nodes_container nodes;
