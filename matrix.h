@@ -24,7 +24,7 @@ public:
 
     template<
         bool Cond = (Dim > 1),
-        typename = typename std::enable_if_t<Cond, void>
+        typename = typename std::enable_if_t<Cond>
     >
     Placeholder<Mat, Dim - 1> operator[](const std::size_t& index)
     {
@@ -33,7 +33,7 @@ public:
 
     template<
         bool Cond = (Dim == 1),
-        typename = typename std::enable_if_t<Cond, void>
+        typename = typename std::enable_if_t<Cond>
     >
     Placeholder<Mat, Dim>& operator=(const value_type& other)
     {
