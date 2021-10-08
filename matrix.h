@@ -52,13 +52,9 @@ public:
         bool Cond = (Dim == 1),
         typename = typename std::enable_if_t<Cond>
     >
-    Placeholder<Mat, Dim>& operator=(const Val other)
+    Placeholder<Mat, Dim>& operator=(Val&& other)
     {
-        if constexpr (std::is_reference_v<std::remove_const<Val>>) {
-            set(std::forward(other), indices);
-        } else {
-            set(other, indices);
-        }
+        set(std::forward<Val>(other), indices);
         return *this;
     }
 
@@ -86,13 +82,9 @@ private:
     }
 
     template<typename Val, std::size_t... I>
-    void set(const Val other, std::index_sequence<I...>)
+    void set(Val&& other, std::index_sequence<I...>)
     {
-        if constexpr (std::is_reference_v<std::remove_const<Val>>) {
-            m_matrix.set(std::forward(other), m_coordinates[I]...); 
-        } else {
-            m_matrix.set(other, m_coordinates[I]...);
-        }
+        m_matrix.set(std::forward<Val>(other), m_coordinates[I]...); 
     }
 
     template<std::size_t... I>
@@ -158,7 +150,7 @@ public:
     }
 
     template<typename Index>
-    void set(const T& val, Index&& coordinate)
+    void set(T&& val, Index&& coordinate)
     {
         iterator it = m_nodes.find(coordinate);
         if(it == m_nodes.end()) {
@@ -173,17 +165,17 @@ public:
     }
 
     template<typename Index, typename... Indexes>
-    void set(const T& val, Index&& head, Indexes&&... coordinates)
+    void set(T&& val, Index&& head, Indexes&&... coordinates)
     {
         iterator it = m_nodes.find(head);
         if(it != m_nodes.end()) {
-            it->second.set(val, std::forward<Indexes>(coordinates)...);
+            it->second.set(std::forward<T>(val), std::forward<Indexes>(coordinates)...);
             if(it->second.size() == 0)
                 m_nodes.erase(it);
         } else {
             if(val == default_value)
                 return;
-            m_nodes[head].set(val, std::forward<Indexes>(coordinates)...);
+            m_nodes[head].set(std::forward<T>(val), std::forward<Indexes>(coordinates)...);
         }
     }
 

@@ -8,18 +8,18 @@ namespace detail
 {
 
 template<typename T>
-void print(const T val) {
+void print(T&& val) {
     std::cout << val;
 }
 
 template<typename T, typename... Args>
-void print(const T val, Args&&... coordinates) {
+void print(T&& val, Args&&... coordinates) {
     std::cout << val << ',';
     print(std::forward<Args>(coordinates)...);
 }
 
 template<typename Val, typename... Args>
-void print_flat_dummy(const Val v, Args&&... coordinates)
+void print_flat_dummy(Val&& v, Args&&... coordinates)
 {
     std::cout << "{";
     print(std::forward<Args>(coordinates)...);
